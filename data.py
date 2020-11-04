@@ -18,7 +18,24 @@ from torch.utils.data import Dataset
 
 
 class SegDataSet(Dataset):
-    def __init__(self, path: str):
+    """
+    读取CT数据。
+    数据目录组织形式：
+    .
+    ├── Patient_01
+    │   ├── GT.nii
+    │   └── Patient_01.nii
+    ......
+    └── Patient_n
+        ├── GT.nii
+        └── Patient_n.nii
+    """
+
+    def __init__(self, path: str, group: bool = True):
+        """
+        :param path:    数据的目录
+        :param group:   是否将每个patient的CT图组织到一块，默认True
+        """
         img_files = sorted(glob(os.path.join(path, "*/Patient_*.nii")))
         gt_files = sorted(glob(os.path.join(path, "*/GT.nii")))
         self.imgs = []
@@ -28,9 +45,18 @@ class SegDataSet(Dataset):
             img_data = np.asanyarray(nib.load(img).dataobj)
             gt_data = np.asanyarray(nib.load(gt).dataobj)
 
+            buff_img, buff_gt = [], []
+
             for i in range(img_data.shape[2]):
-                self.imgs.append(img_data[:, :, i])
-                self.gts.append(gt_data[:, :, i])
+                buff_img.append(img_data[:, :, i])
+                buff_gt.append(gt_data[:, :, i])
+
+            if group:
+                self.imgs.append(buff_img)
+                self.gts.append(buff_gt)
+            else:
+                self.imgs.extend(buff_img)
+                self.gts.extend(buff_gt)
 
     def __len__(self):
         return len(self.imgs)

@@ -1,10 +1,12 @@
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from scipy.spatial.distance import directed_hausdorff, dice
+from scipy.spatial.distance import dice, directed_hausdorff
 
+from config import get_namespace
 from data import SegDataSet
-from lmser import LMSER
+from model import SegModel
+
 
 class Metric:
     """
@@ -20,6 +22,7 @@ class Metric:
     AHD: 计算点集A和B间的距离时，定义d(A,B)表示对A中每个点a，找到B中距离其最近的
     点b，计算(1/N)*\sum_{a}||a-b||。则AHD定义为max(d(A,B), d(B,A))
     """
+
     def __init__(self):
         self.dice_scores = []
         self.ahd_scores = []
@@ -28,7 +31,7 @@ class Metric:
         assert len(pred_batch) == len(target_batch)
         for i in range(len(pred_batch)):
             dice_score = []
-            for j in range(5): # 5是分类数
+            for j in range(5):  # 5是分类数
                 dice_score.append(dice((pred_batch[i] == j).flatten(), (target_batch[i] == j).flatten()))
                 # TODO: 计算AHD。scipy中的directed_hausdorff计算的是HD而不是AHD。相关资料参考（关键词：Hausdorff）https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/
             self.dice_scores.append(tuple(dice_score))
@@ -38,11 +41,12 @@ class Metric:
         dice_var = np.var(np.array(self.dice_scores), axis=0)
         return dice_mean, dice_var
 
+
 class Trainer:
     def __init__(self, model, optimizer, rebuild_criterion, classify_criterion, alpha: float, lmser_steps: int):
         """
         :param lmser_steps: LMSER的反复迭代次数
-        :param alpha: 重建loss的系数
+        :param alpha:       重建loss的系数
         """
         self.model = model
         self.optimizer = optimizer
@@ -63,8 +67,8 @@ class Trainer:
             for iter_i, (data_batch, target_batch) in enumerate(train_data_loader):
                 # forward
                 rebuild_out, classify_out = self.model(data_batch)
-                rebuild_loss = self.rebuild_criterion(rebuild_out, data_batch) # TODO
-                classify_loss = self.classify_criterion(classify_out, target_batch) # TODO: 检查参数列表
+                rebuild_loss = self.rebuild_criterion(rebuild_out, data_batch)  # TODO
+                classify_loss = self.classify_criterion(classify_out, target_batch)  # TODO: 检查参数列表
                 loss = self.alpha * rebuild_loss + classify_loss
                 # TODO: 输出loss
                 # backward
@@ -79,11 +83,11 @@ class Trainer:
             with torch.no_grad():
                 for iter_i, (data_batch, target_batch) in enumerate(dev_data_loader):
                     rebuild_out, classify_out = self.model(data_batch)
-                    metric.update(classify_out.cpu().detach().numpy().argmax(axis=4), target_batch.cpu().detach().numpy())
+                    metric.update(classify_out.cpu().detach().numpy().argmax(
+                        axis=4), target_batch.cpu().detach().numpy())
                 dice_mean, dice_var = metric.result()
                 # TODO: 输出validation结果
                 # TODO: 是否加入scheduler?
-
 
     def test(self):
         pass
