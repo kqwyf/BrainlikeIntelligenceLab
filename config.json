@@ -1,5 +1,12 @@
 {
     "description": "这个是配置文件，主要放模型训练时的超参",
-    "train_dataset": "/mnt/lustre/sjtu/home/lfd98/Dataset/SegTHOR2019/train",
-    "test_dataset": "/mnt/lustre/sjtu/home/lfd98/Dataset/SegTHOR2019/test"
+    "data": {
+        "train": {
+            "path": "/mnt/lustre/sjtu/home/lfd98/Dataset/SegTHOR2019/train"
+        },
+        "test": {
+            "path": "/mnt/lustre/sjtu/home/lfd98/Dataset/SegTHOR2019/test"
+        }
+    },
+    "model": {}
 }
