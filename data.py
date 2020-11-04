@@ -11,16 +11,30 @@ import os
 from glob import glob
 
 import nibabel as nib  # 读取nii格式
+import numpy as np
+import torch
 from torch.utils.data import Dataset
 
 
 class SegDataSet(Dataset):
     def __init__(self, path: str):
-        self.img_files = sorted(glob(os.path.join(path, "*/Patient_*.nii")))
-        self.gt_files = sorted(glob(os.path.join(path, "*/GT.nii")))
+        img_files = sorted(glob(os.path.join(path, "*/Patient_*.nii")))
+        gt_files = sorted(glob(os.path.join(path, "*/GT.nii")))
+        self.imgs = []
+        self.gts = []
+
+        for img, gt in zip(img_files, gt_files):
+            img_data = np.asanyarray(nib.load(img).dataobj)
+            gt_data = np.asanyarray(nib.load(gt).dataobj)
+
+            for i in range(img_data.shape[2]):
+                self.imgs.append(img_data[:, :, i])
+                self.gts.append(gt_data[:, :, i])
 
     def __len__(self):
-        pass
+        return len(self.imgs)
 
     def __getitem__(self, index):
-        pass
+        img = torch.Tensor(self.imgs[index])
+        gt = torch.Tensor(self.gts[index])
+        return img, gt
