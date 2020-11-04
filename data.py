@@ -6,6 +6,7 @@
 * Patient_%2d.nii   shape: (512, 512, n)    dtype: int32
 
 GT.nii应该是Ground-Truth，因此数据更小。
+GT的数据在0~4之间，是分类编号
 """
 import os
 from glob import glob
