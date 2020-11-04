@@ -1,4 +1,4 @@
-""" Least mean square error reconstruction principle for self-organizing neural-nets. """
+""" Fantastic Models """
 from typing import List, Tuple
 
 import torch
@@ -10,7 +10,7 @@ class ProjLayer(nn.Module):
         super().__init__()
         self.proj = nn.Parameter(torch.randn(dim1, dim2))
 
-    def forward(self, x, go_up: bool):
+    def forward(self, x: torch.Tensor, go_up: bool):
         return x.matmul(self.proj) if go_up else x.matmul(self.proj.t())
 
 
@@ -24,7 +24,7 @@ class LMSER(nn.Module):
         self.layers = nn.ModuleList(ProjLayer(d1, d2) for d1, d2 in zip(dims[:-1], dims[1:]))
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x, steps=-1):
+    def forward(self, x: torch.Tensor, steps=-1):
         assert len(x.shape) == 3, f"Dimension of input should be 3. Got {x.shape}"
 
         batch = x.shape[0]
@@ -63,7 +63,16 @@ class LMSER(nn.Module):
         return last_out
 
 
-if __name__ == "__main__":
+class SegModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        pass
+
+    def forward(self, x: torch.Tensor):
+        pass
+
+
+def _test():
     b, _shape = 4, (32, 48)
     _hidden_dims = [64, 32, 16]
     lmser = LMSER(_shape, _hidden_dims)
@@ -72,3 +81,7 @@ if __name__ == "__main__":
     out_img = lmser(inp_img)
 
     print(out_img.shape)
+
+
+if __name__ == "__main__":
+    _test()
