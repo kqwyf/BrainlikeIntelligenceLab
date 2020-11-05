@@ -15,16 +15,22 @@ class ProjLayer(nn.Module):
 
 
 class LMSER(nn.Module):
-    def __init__(self, shape: Tuple[int, int], hidden_dims: List[int]):
-        super().__init__()
-        self.shape = shape
-        self.hidden_dims = hidden_dims
-        dims = [shape[0] * shape[1]] + hidden_dims
+    @staticmethod
+    def add_arguments(parser):
+        parser.add_argument("--lmser-steps", default=-1, type=int,
+                help="LMSER的反复迭代次数。")
+        parser.add_argument("--lmser-dims", required=True, nargs='+', type=int,
+                help="LMSER的各层宽度，以逗号分隔")
 
-        self.layers = nn.ModuleList(ProjLayer(d1, d2) for d1, d2 in zip(dims[:-1], dims[1:]))
+    def __init__(self, args):
+        super().__init__()
+        self.steps = args.lmser_steps
+        self.dims = args.lmser_dims
+
+        self.layers = nn.ModuleList(ProjLayer(d1, d2) for d1, d2 in zip(self.dims[:-1], self.dims[1:]))
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x: torch.Tensor, steps=-1):
+    def forward(self, x: torch.Tensor):
         assert len(x.shape) == 3, f"Dimension of input should be 3. Got {x.shape}"
 
         batch = x.shape[0]
@@ -38,7 +44,7 @@ class LMSER(nn.Module):
         step = 0
 
         while True:
-            if step == steps:
+            if step == self.steps:
                 break
             step += 1
 
@@ -75,7 +81,10 @@ class SegModel(nn.Module):
 def _test():
     b, _shape = 4, (32, 48)
     _hidden_dims = [64, 32, 16]
-    lmser = LMSER(_shape, _hidden_dims)
+    lmser = LMSER({
+        "lmser_steps": -1,
+        "lmser_dims": [64, 32, 16]
+    })
 
     inp_img = torch.rand(b, *_shape)
     out_img = lmser(inp_img)

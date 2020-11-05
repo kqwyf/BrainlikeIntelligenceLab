@@ -31,13 +31,16 @@ class SegDataSet(Dataset):
         └── Patient_n.nii
     """
 
-    def __init__(self, path: str, group: bool = True):
-        """
-        :param path:    数据的目录
-        :param group:   是否将每个patient的CT图组织到一块，默认True
-        """
-        img_files = sorted(glob(os.path.join(path, "*/Patient_*.nii")))
-        gt_files = sorted(glob(os.path.join(path, "*/GT.nii")))
+    @staticmethod
+    def add_arguments(parser):
+        parser.add_argument("--dataset-path", required=True,
+                help="数据集路径。")
+        parser.add_argument("--dataset-group", type=bool, default=True,
+                help="是否将同一patient的图片成组输入。")
+
+    def __init__(self, args):
+        img_files = sorted(glob(os.args.path.join(args.path, "*/Patient_*.nii")))
+        gt_files = sorted(glob(os.args.path.join(args.path, "*/GT.nii")))
         self.imgs = []
         self.gts = []
 
@@ -51,7 +54,7 @@ class SegDataSet(Dataset):
                 buff_img.append(img_data[:, :, i])
                 buff_gt.append(gt_data[:, :, i])
 
-            if group:
+            if args.group:
                 self.imgs.append(buff_img)
                 self.gts.append(buff_gt)
             else:

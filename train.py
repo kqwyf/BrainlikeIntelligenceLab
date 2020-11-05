@@ -1,9 +1,9 @@
+import configargparse
 import numpy as np
 import torch
 import torch.nn as nn
 from scipy.spatial.distance import dice, directed_hausdorff
 
-from config import get_namespace
 from data import SegDataSet
 from model import SegModel
 
@@ -43,23 +43,30 @@ class Metric:
 
 
 class Trainer:
-    def __init__(self, model, optimizer, rebuild_criterion, classify_criterion, alpha: float, lmser_steps: int):
+    @staticmethod
+    def add_arguments(parser):
+        parser.add_argument("--rebuild-alpha", default=0.5, type=float,
+                help="重建loss的比重。对分类loss而言其比重为(1 - rebuild_alpha)。")
+        parser.add_argument("--num-epoch", required=True, type=int,
+                help="训练轮数。")
+
+    def __init__(self, args, model, optimizer, rebuild_criterion, classify_criterion):
         """
         :param lmser_steps: LMSER的反复迭代次数
-        :param alpha:       重建loss的系数
+        :param alpha:       重建loss的比重，分类loss的比重为(1 - alpha)
         """
         self.model = model
         self.optimizer = optimizer
         self.rebuild_criterion = rebuild_criterion
         self.classify_criterion = classify_criterion
-        self.lmser_steps = lmser_steps
-        self.alpha = alpha
+        self.rebuild_alpha = args.rebuild_alpha
+        self.num_epochs = args.num_epochs
 
-    def train(self, train_data_loader, dev_data_loader, num_epochs):
+    def train(self, train_data_loader, dev_data_loader):
         # NOTE: 我们希望model.forward()返回两个对象，一个是LMSER的重建结果，另一个是网络的预测（分类）概率输出
         # 期望重建输出形状与输入相同，即: (512, 512, n)
         # 期望预测输出形状: (512, 512, n, 5)
-        for epoch_i in range(1, num_epochs + 1):
+        for epoch_i in range(1, self.num_epochs + 1):
             # train
             self.model.train()
             self.rebuild_criterion.train()
@@ -69,7 +76,7 @@ class Trainer:
                 rebuild_out, classify_out = self.model(data_batch)
                 rebuild_loss = self.rebuild_criterion(rebuild_out, data_batch)  # TODO
                 classify_loss = self.classify_criterion(classify_out, target_batch)  # TODO: 检查参数列表
-                loss = self.alpha * rebuild_loss + classify_loss
+                loss = self.rebuild_alpha * rebuild_loss + classify_loss
                 # TODO: 输出loss
                 # backward
                 self.optimizer.zero_grad()
@@ -94,4 +101,13 @@ class Trainer:
 
 
 if __name__ == "__main__":
-    pass
+    parser = configargparse.ArgumentParser(
+                default_config_files=["conf/train.yaml"],
+                config_file_parser_class=configargparse.YAMLConfigFileParser,
+                formatter_class=configargparse.ArgumentDefaultsHelpFormatter
+            )
+    parser.add("--config", is_config_file=True, help="配置文件。")
+    parser.add_argument("--resume", default="", nargs="?", help="从参数给出的checkpoint继续训练。")
+
+    Trainer.add_arguments(parser)
+
