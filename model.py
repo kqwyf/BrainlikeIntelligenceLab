@@ -4,6 +4,8 @@ from typing import List, Tuple
 import torch
 import torch.nn as nn
 
+from unet import UNet
+
 
 class ProjLayer(nn.Module):
     def __init__(self, dim1: int, dim2: int):
@@ -70,12 +72,20 @@ class LMSER(nn.Module):
 
 
 class SegModel(nn.Module):
-    def __init__(self):
+    @staticmethod
+    def add_arguments(parser):
+        parser.add_argument("--num-classes", default=5, type=int,
+                help="分类数。")
+        UNet.add_arguments(parser)
+
+    def __init__(self, args):
         super().__init__()
-        pass
+        self.num_classes = args.num_classes
+        self.unet = UNet(args, self.num_classes)
 
     def forward(self, x: torch.Tensor):
-        pass
+        x = self.unet(x)
+        return x
 
 
 def _test():
