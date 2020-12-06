@@ -169,6 +169,7 @@ def main(cmd_args):
 
     if args.exp_dir is None:
         args.exp_dir = "exp/{}".format(os.path.splitext(os.path.basename(args.config))[0])
+    os.makedirs(args.exp_dir, exist_ok=True)
 
     logging.basicConfig(filename=args.log_path,
                         format="%(asctime)s - $(levelname)s - %(message)s",
