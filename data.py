@@ -40,7 +40,7 @@ class SegDataSet(Dataset):
                 help="测试集路径。")
         parser.add_argument("--dataset-num-dev-samples", type=int, required=True,
                 help="将训练集中的多少（病人）样本作为验证集。")
-        parser.add_argument("--dataset-preprocessing", action="append", choices=["add_channel_dim", "expand", "group_diff", "group_diff2", "normalize"],
+        parser.add_argument("--dataset-preprocessing", action="append", choices=["add_context1", "add_context2", "expand", "normalize", "normalize_group"],
                 help="""数据集需进行的预处理步骤，可用逗号隔开以连续使用多个步骤。
                         add_context1：为每张图片加入channel维，并对每组数据将前后1帧数据与当前帧在channel维上concat。
                         add_context2：为每张图片加入channel维，并对每组数据将前后2帧数据与当前帧在channel维上concat。
