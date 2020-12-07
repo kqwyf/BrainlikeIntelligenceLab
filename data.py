@@ -10,6 +10,7 @@ GT的数据在0~4之间，是分类编号
 """
 import os
 from glob import glob
+
 import nibabel as nib  # 读取nii格式
 import numpy as np
 import torch
