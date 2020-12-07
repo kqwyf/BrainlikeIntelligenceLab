@@ -14,7 +14,7 @@ dataset-preprocessing: normalize_group, add_context1, expand # 以逗号隔开�
 # 训练
 #exp-dir: "exp/train" # 实验目录，通常无需设置该参数，会根据配置文件名生成
 optimizer: "adam"
-criterion: "ce"
+criterion: "ce"  # 可选：ce, mse, focal
 num-epoch: 20
 batch-size: 1
 learning-rate: 1e-3

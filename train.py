@@ -1,16 +1,18 @@
-import sys
-import os
-from glob import glob
-import configargparse
 import logging
+import os
+import sys
+from glob import glob
+from typing import Optional
+
+import configargparse
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from scipy.spatial.distance import dice, directed_hausdorff
 
 from data import SegDataSet
 from model import SegModel
-
 
 CONFIG_FILE = "conf/train.yaml" # 默认配置文件路径
 CKPT_FILENAME = "checkpoint.ep.%02d" # checkpoint默认文件名，其中整数为已训练轮数
@@ -55,8 +57,89 @@ class Metric:
         return dice_mean, dice_var
 
 
+class FocalLoss(nn.Module):
+    """ Focal Loss, as described in https://arxiv.org/abs/1708.02002.
+    It is essentially an enhancement to cross entropy loss and is
+    useful for classification tasks when there is a large class imbalance.
+    x is expected to contain raw, unnormalized scores for each class.
+    y is expected to contain class labels.
+    Shape:
+        - x: (batch_size, C) or (batch_size, C, d1, d2, ..., dK), K > 0.
+        - y: (batch_size,) or (batch_size, d1, d2, ..., dK), K > 0.
+    """
+
+    def __init__(self, alpha: Optional[torch.Tensor] = None, gamma: float = 0.,
+                 reduction: str = 'mean', ignore_index: int = -100):
+        """
+        Args:
+            alpha (Tensor, optional): Weights for each class. Defaults to None.
+            gamma (float, optional): A constant, as described in the paper.
+                Defaults to 0.
+            reduction (str, optional): 'mean', 'sum' or 'none'.
+                Defaults to 'mean'.
+            ignore_index (int, optional): class label to ignore.
+                Defaults to -100.
+        """
+        if reduction not in ('mean', 'sum', 'none'):
+            raise ValueError('Reduction must be one of: "mean", "sum", "none".')
+
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+
+        self.nll_loss = nn.NLLLoss(
+            weight=alpha, reduction='none', ignore_index=ignore_index)
+
+    def __repr__(self):
+        arg_keys = ['alpha', 'gamma', 'ignore_index', 'reduction']
+        arg_vals = [self.__dict__[k] for k in arg_keys]
+        arg_strs = [f'{k}={v}' for k, v in zip(arg_keys, arg_vals)]
+        arg_str = ', '.join(arg_strs)
+        return f"{type(self).__name__}({arg_str})"
+
+    def forward(self, x: torch.FloatTensor, y: torch.LongTensor) -> torch.FloatTensor:
+        if x.ndim > 2:
+            # (N, C, d1, d2, ..., dK) --> (N * d1 * ... * dK, C)
+            c = x.shape[1]
+            x = x.permute(0, *range(2, x.ndim), 1).reshape(-1, c)
+            # (N, d1, d2, ..., dK) --> (N * d1 * ... * dK,)
+            y = y.view(-1)
+
+        unignored_mask = y != self.ignore_index
+        y = y[unignored_mask]
+        if len(y) == 0:
+            return 0.
+        x = x[unignored_mask]
+
+        # compute weighted cross entropy term: -alpha * log(pt)
+        # (alpha is already part of self.nll_loss)
+        log_p = F.log_softmax(x, dim=-1)
+        ce = self.nll_loss(log_p, y)
+
+        # get true class column from each row
+        all_rows = torch.arange(len(x))
+        log_pt = log_p[all_rows, y]
+
+        # compute focal term: (1 - pt)^gamma
+        pt = log_pt.exp()
+        focal_term = (1 - pt)**self.gamma
+
+        # The full loss: -alpha * ((1 - pt)^gamma) * log(pt)
+        loss = focal_term * ce
+
+        if self.reduction == 'mean':
+            loss = loss.mean()
+        elif self.reduction == 'sum':
+            loss = loss.sum()
+
+        return loss
+
+
 def save_checkpoint(path: str, epoch_i: int, model: nn.Module, criterion: nn.Module, optimizer: nn.Module):
     torch.save((epoch_i, model.state_dict(), criterion.state_dict(), optimizer.state_dict()), path)
+
 
 def load_checkpoint(path: str, model: nn.Module, criterion: nn.Module, optimizer: nn.Module):
     epoch_i, model_state, criterion_state, optimizer_state = torch.load(path)
@@ -64,6 +147,7 @@ def load_checkpoint(path: str, model: nn.Module, criterion: nn.Module, optimizer
     criterion.load_state_dict(criterion_state)
     optimizer.load_state_dict(optimizer_state)
     return epoch_i
+
 
 class Trainer:
     @staticmethod
@@ -102,11 +186,12 @@ class Trainer:
             self.model.train()
             self.criterion.train()
             self.optimizer.zero_grad()
+
             for iter_i, (data_batch, target_batch) in enumerate(data_loader_train):
                 # forward
                 out = self.model(data_batch)
                 loss = self.criterion(out.reshape(-1, out.shape[-1]), target_batch.flatten())
-                logging.info("    loss = %.3f"%(loss))
+                logging.info("    loss = %.3f" % (loss))
                 # backward
                 loss.backward()
                 # 梯度累加
@@ -115,8 +200,9 @@ class Trainer:
                         logging.warn("    Force accumulating gradients at epoch end.")
                     self.optimizer.step()
                     self.optimizer.zero_grad()
+
             # validation
-            logging.info("Epoch %d: Validation"%epoch_i)
+            logging.info("Epoch %d: Validation" % epoch_i)
             self.model.eval()
             self.criterion.eval()
             self.metric.reset()
@@ -128,10 +214,12 @@ class Trainer:
             dice_mean, dice_var = self.metric.result()
             logging.info("    Dice = (%.2f +- %.2f), AHD = (NULL)")
             # TODO: 是否加入scheduler?
+
             # 保存checkpoint
             ckpt_path = os.path.join(self.exp_dir, CKPT_FILENAME % epoch_i)
             save_checkpoint(ckpt_path, epoch_i, self.model, self.criterion, self.optimizer)
             logging.info("Checkpoint saved to " + ckpt_path)
+
         logging.info("Training finished.")
 
 
@@ -151,7 +239,7 @@ def main(cmd_args):
             help="优化器，可选项包括：adam。")
     parser.add_argument("--learning-rate", type=float, default=1e-3,
             help="学习率。")
-    parser.add_argument("--criterion", choices=["ce", "mse"], default="ce",
+    parser.add_argument("--criterion", choices=["ce", "mse", "focal"], default="focal",
             help="Loss函数，可选项包括：ce（交叉熵），mse（最小均方误差）。")
 
     Trainer.add_arguments(parser)
@@ -185,12 +273,14 @@ def main(cmd_args):
         criterion = nn.CrossEntropyLoss()
     elif args.criterion == "mse":
         criterion = nn.MSELoss()
+    elif args.criterion == "focal":
+        criterion = FocalLoss()
     else:
         raise NotImplementedError("Criterion %s not implemented" % args.criterion)
 
     trainer = Trainer(args, model, optimizer, criterion)
     trainer.train(data_loader_train, data_loader_dev)
 
+
 if __name__ == "__main__":
     main(sys.argv[1:])
-
