@@ -2,13 +2,14 @@
 dataset-path-train: "/mnt/lustre/sjtu/home/yfw51/Datasets/SegTHOR2019/train"
 dataset-path-test: "/mnt/lustre/sjtu/home/yfw51/Datasets/SegTHOR2019/test"
 dataset-num-dev-samples: 5 # 将训练集中的多少病人用作开发集
-dataset-group: True # 是否将同一病人的图片成组输入
 
 # 数据预处理
-# expand：将成组数据展开至batch_size维。
-# group_diff：对每组数据求1阶差分，与原数据在channel维上concat。
-# group_diff2：对每组数据求1阶和2阶差分，与原数据在channel维上concat。
-preprocessing: group_diff2, expand # 会在collate_fn中执行的预处理步骤，以逗号隔开多个步骤会让它们按顺序执行
+# add_context1：为每张图片加入channel维，并对每组数据将前后1帧数据与当前帧在channel维上concat。
+# add_context2：为每张图片加入channel维，并对每组数据将前后2帧数据与当前帧在channel维上concat。
+# expand：将成组数据展开为独立的图片。由于输出图片不再成组，应放在所有预处理步骤的最后使用。
+# normalize：对每张图片进行正态归一化。
+# normalize_group：对每组图片进行正态归一化。
+dataset-preprocessing: normalize_group, add_context1, expand # 以逗号隔开多个步骤会让它们按顺序执行
 
 # 训练
 #exp-dir: "exp/train" # 实验目录，通常无需设置该参数，会根据配置文件名生成

@@ -10,7 +10,6 @@ from scipy.spatial.distance import dice, directed_hausdorff
 
 from data import SegDataSet
 from model import SegModel
-from preprocessing import preprocess
 
 
 CONFIG_FILE = "conf/train.yaml" # 默认配置文件路径
@@ -154,12 +153,6 @@ def main(cmd_args):
             help="学习率。")
     parser.add_argument("--criterion", choices=["ce", "mse"], default="ce",
             help="Loss函数，可选项包括：ce（交叉熵），mse（最小均方误差）。")
-    parser.add_argument("--preprocessing", action="append", choices=["expand", "group_diff", "group_diff2"],
-            help="""数据输入模型前需进行的预处理步骤，可用逗号隔开以连续使用多个步骤。
-                    归一化步骤将在下列所有步骤之前自动完成。
-                    expand：将成组数据展开至batch_size维。
-                    group_diff：对每组数据求1阶差分，与原数据在channel维上concat。
-                    group_diff2：对每组数据求1阶和2阶差分，与原数据在channel维上concat。""")
 
     Trainer.add_arguments(parser)
     SegModel.add_arguments(parser)
@@ -178,10 +171,8 @@ def main(cmd_args):
     # create objects needed by training
     dataset_train = SegDataSet(args, "train")
     dataset_dev= SegDataSet(args, "dev")
-    data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size,
-            shuffle=True, collate_fn=lambda x: preprocess(x, args.preprocessing))
-    data_loader_dev = torch.utils.data.DataLoader(dataset_dev, batch_size=args.batch_size,
-            shuffle=True, collate_fn=lambda x: preprocess(x, args.preprocessing))
+    data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
+    data_loader_dev = torch.utils.data.DataLoader(dataset_dev, batch_size=args.batch_size, shuffle=True)
 
     model = SegModel(args)
 

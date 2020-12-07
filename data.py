@@ -10,11 +10,12 @@ GT的数据在0~4之间，是分类编号
 """
 import os
 from glob import glob
-
 import nibabel as nib  # 读取nii格式
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+
+from preprocessing import preprocess
 
 
 class SegDataSet(Dataset):
@@ -39,14 +40,18 @@ class SegDataSet(Dataset):
                 help="测试集路径。")
         parser.add_argument("--dataset-num-dev-samples", type=int, required=True,
                 help="将训练集中的多少（病人）样本作为验证集。")
-        parser.add_argument("--dataset-group", type=bool, default=True,
-                help="是否将同一病人的图片成组输入。")
+        parser.add_argument("--dataset-preprocessing", action="append", choices=["add_channel_dim", "expand", "group_diff", "group_diff2", "normalize"],
+                help="""数据集需进行的预处理步骤，可用逗号隔开以连续使用多个步骤。
+                        add_context1：为每张图片加入channel维，并对每组数据将前后1帧数据与当前帧在channel维上concat。
+                        add_context2：为每张图片加入channel维，并对每组数据将前后2帧数据与当前帧在channel维上concat。
+                        expand：将成组数据展开为独立的图片。由于输出图片不再成组，应放在所有预处理步骤的最后使用。
+                        normalize：对每张图片进行正态归一化。
+                        normalize_group：对每组图片进行正态归一化。""")
 
     def __init__(self, args, mode):
         """
         :param mode: 可选项：train, dev, test
         """
-        self.group = args.dataset_group
         self.num_dev_samples = args.dataset_num_dev_samples
 
         if mode in ["train", "dev"]:
@@ -71,20 +76,23 @@ class SegDataSet(Dataset):
             buff_img, buff_gt = [], []
 
             for i in range(img_data.shape[2]):
-                buff_img.append(img_data[:, :, i])
-                buff_gt.append(gt_data[:, :, i])
+                buff_img.append(torch.tensor(img_data[:, :, i], dtype=torch.float32))
+                buff_gt.append(torch.tensor(gt_data[:, :, i], dtype=torch.long))
 
-            if self.group:
-                self.imgs.append(buff_img)
-                self.gts.append(buff_gt)
-            else:
-                self.imgs.extend(buff_img)
-                self.gts.extend(buff_gt)
+            self.imgs.append(buff_img)
+            self.gts.append(buff_gt)
+
+        self.imgs, self.gts = preprocess(self.imgs, self.gts, args.dataset_preprocessing)
+        self.group = (type(self.imgs[0]) != torch.Tensor) # 最终数据是否成组
 
     def __len__(self):
         return len(self.imgs)
 
     def __getitem__(self, index):
-        img = torch.Tensor(self.imgs[index])
-        gt = torch.Tensor(self.gts[index])
+        if self.group:
+            img = torch.stack(self.imgs[index])
+            gt = torch.stack(self.gts[index])
+        else:
+            img = self.imgs[index]
+            gt = self.gts[index]
         return img, gt
