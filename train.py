@@ -15,6 +15,7 @@ from data import SegDataSet
 from model import SegModel
 
 CONFIG_FILE = "conf/train.yaml" # 默认配置文件路径
+LOG_FILENAME = "train.log"
 CKPT_FILENAME = "checkpoint.ep.%02d" # checkpoint默认文件名，其中整数为已训练轮数
 CKPT_FILENAME_GLOB = "checkpoint.ep.*"
 
@@ -229,7 +230,7 @@ def main(cmd_args):
                 config_file_parser_class=configargparse.YAMLConfigFileParser,
                 formatter_class=configargparse.ArgumentDefaultsHelpFormatter
             )
-    parser.add("--config", is_config_file=True,
+    parser.add("--config", is_config_file=True, default=CONFIG_FILE,
             help="配置文件。")
     parser.add_argument("--exp-dir", default=None,
             help="日志、模型等文件的存放路径，默认为exp/{exp_name}。其中{exp_name}为配置文件名去除后缀。")
@@ -246,13 +247,13 @@ def main(cmd_args):
     SegModel.add_arguments(parser)
     SegDataSet.add_arguments(parser)
 
-    args, _ = parser.parse_args(cmd_args)
+    args = parser.parse_args(cmd_args)
 
     if args.exp_dir is None:
         args.exp_dir = "exp/{}".format(os.path.splitext(os.path.basename(args.config))[0])
     os.makedirs(args.exp_dir, exist_ok=True)
 
-    logging.basicConfig(filename=args.log_path,
+    logging.basicConfig(filename=os.path.join(args.exp_dir, LOG_FILENAME),
                         format="%(asctime)s - $(levelname)s - %(message)s",
                         datefmt="%y-%m-%d %H:%M:%S")
 
