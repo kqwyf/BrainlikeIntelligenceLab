@@ -155,7 +155,7 @@ class Trainer:
     def add_arguments(parser):
         parser.add_argument("--resume", default="NONE", nargs="?",
                 help="从参数给出的checkpoint继续训练。“NONE”表示忽略该参数。若参数为空，则从exp_dir参数给出的路径中读取编号最大的checkpoint。")
-        parser.add_argument("--num-epoch", required=True, type=int,
+        parser.add_argument("--num-epochs", required=True, type=int,
                 help="训练轮数。")
         parser.add_argument("--accum-grad", type=int, default=1,
                 help="连续累加几个batch的梯度，一并优化。若当前epoch剩余batch数不足，则在epoch结束时优化。")
