@@ -167,11 +167,12 @@ class Trainer:
         self.num_epochs = args.num_epochs
         self.accum_grad = args.accum_grad
         self.exp_dir = args.exp_dir
-        if args.resume == "": # 没有使用resume参数
+        self.device = args.device
+        if args.resume == "NONE": # 没有使用resume参数
             resume = False
             self.epoch_start = 0
         else: # 使用了resume参数
-            if args.resume is None: # 使用了resume参数，没有填写checkpoint路径
+            if args.resume == "": # 使用了resume参数，没有填写checkpoint路径
                 resume = True
                 ckpt_path = sorted(glob(os.path.join(args.exp_dir, CKPT_FILENAME_GLOB)))[-1]
             else: # 使用了resume参数，填写了checkpoint路径
@@ -189,9 +190,11 @@ class Trainer:
             self.optimizer.zero_grad()
 
             for iter_i, (data_batch, target_batch) in enumerate(data_loader_train):
+                data_batch, target_batch = data_batch.to(self.device), target_batch.to(self.device)
                 # forward
                 out = self.model(data_batch)
-                loss = self.criterion(out.reshape(-1, out.shape[-1]), target_batch.flatten())
+                out_p = out.permute(0, 2, 3, 1) # 将channel维放在最后
+                loss = self.criterion(out_p.view(-1, out_p.shape[-1]), target_batch.flatten())
                 logging.info("    loss = %.3f" % (loss))
                 # backward
                 loss.backward()
@@ -209,9 +212,11 @@ class Trainer:
             self.metric.reset()
             with torch.no_grad():
                 for iter_i, (data_batch, target_batch) in enumerate(data_loader_dev):
-                    rebuild_out, classify_out = self.model(data_batch)
-                    self.metric.update(classify_out.cpu().detach().numpy().argmax(
-                        axis=4), target_batch.cpu().detach().numpy())
+                    data_batch, target_batch = data_batch.to(self.device), target_batch.to(self.device)
+                    out = self.model(data_batch)
+                    out_p = out.permute(0, 2, 3, 1) # 将channel维放在最后
+                    self.metric.update(out_p.cpu().detach().numpy().argmax(
+                        axis=3), target_batch.cpu().detach().numpy())
             dice_mean, dice_var = self.metric.result()
             logging.info("    Dice = (%.2f +- %.2f), AHD = (NULL)")
             # TODO: 是否加入scheduler?
@@ -232,6 +237,8 @@ def main(cmd_args):
             )
     parser.add("--config", is_config_file=True, default=CONFIG_FILE,
             help="配置文件。")
+    parser.add_argument("--device", choices=["cuda:0", "cpu"], default="cuda:0",
+            help="使用CPU或GPU进行训练。")
     parser.add_argument("--exp-dir", default=None,
             help="日志、模型等文件的存放路径，默认为exp/{exp_name}。其中{exp_name}为配置文件名去除后缀。")
     parser.add_argument("--batch-size", type=int, default=1,
@@ -263,7 +270,7 @@ def main(cmd_args):
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
     data_loader_dev = torch.utils.data.DataLoader(dataset_dev, batch_size=args.batch_size, shuffle=True)
 
-    model = SegModel(args)
+    model = SegModel(args).to(args.device)
 
     if args.optimizer == "adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
@@ -278,6 +285,7 @@ def main(cmd_args):
         criterion = FocalLoss()
     else:
         raise NotImplementedError("Criterion %s not implemented" % args.criterion)
+    criterion.to(args.device)
 
     trainer = Trainer(args, model, optimizer, criterion)
     trainer.train(data_loader_train, data_loader_dev)

@@ -54,6 +54,6 @@ class UNet(nn.Module):
             xs.append(self.downs[i](xs[-1]))
         for i in range(self.num_layers):
             xs[-(i + 2)] = self.ups[i](xs[-(i + 1)], xs[-(i + 2)])
-        logits = self.outc(xs[0])
+        logits = self.outc(xs[1])
         return logits
 
