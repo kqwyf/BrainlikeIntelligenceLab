@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from glob import glob
 
 import configargparse
 import matplotlib.pyplot as plt
@@ -14,6 +15,7 @@ from model import SegModel
 
 CONFIG_FILE = "conf/train.yaml"  # 默认配置文件路径
 LOG_FILENAME = "train.log"
+CKPT_FILENAME_GLOB = "checkpoint.ep.*"
 
 
 def load_checkpoint(path: str, model: nn.Module):
@@ -34,7 +36,7 @@ def cutter(args, model: nn.Module, data_loader: DataLoader):
 
         # 保存结果
         for i, img in enumerate(out):
-            im_path = os.path.join(args.exp_dir, "seg", f"{i}.jpg")    # TODO: 路径
+            im_path = os.path.join(args.exp_dir, "seg", f"{i}.jpg")
             plt.imsave(im_path, img)
 
     logging.info("Segmentation completed.")
@@ -50,16 +52,22 @@ def main(cmd_args):
     parser.add_argument("--device", choices=["cuda:0", "cpu"], default="cuda:0", help="使用CPU或GPU进行训练。")
     parser.add_argument("--exp-dir", default=None, help="日志、模型等文件的存放路径，默认为exp/{exp_name}。其中{exp_name}为配置文件名去除后缀。")
     parser.add_argument("--batch-size", type=int, default=1, help="Batch size。")
-    parser.add_argument("--checkpoint", type=str, help="Checkpoint存储位置。")
+    parser.add_argument("--checkpoint", type=str, default=None, help="Checkpoint存储位置。")
 
     SegModel.add_arguments(parser)
     SegDataSet.add_arguments(parser)
 
-    args = parser.parse_args(cmd_args)
+    args, _ = parser.parse_known_args(cmd_args)    # 只加载认识的参数
+    parser.print_values()
 
     if args.exp_dir is None:
         args.exp_dir = "exp/{}".format(os.path.splitext(os.path.basename(args.config))[0])
     os.makedirs(args.exp_dir, exist_ok=True)
+
+    # 如果不提供checkpoint，则默认加载最后一轮训练结果
+    if args.checkpoint is None:
+        ckpt_path = sorted(glob(os.path.join(args.exp_dir, CKPT_FILENAME_GLOB)))[-1]
+        args.checkpoint = ckpt_path
 
     logging.basicConfig(filename=os.path.join(args.exp_dir, LOG_FILENAME),
                         level="INFO",
