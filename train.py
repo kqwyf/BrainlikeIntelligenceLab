@@ -48,7 +48,12 @@ class Metric:
         for i in range(len(pred_batch)):
             dice_score = []
             for j in range(self.num_classes):
-                dice_score.append(dice((pred_batch[i] == j).flatten(), (target_batch[i] == j).flatten()))
+                pred_bool = (pred_batch[i] == j).flatten()
+                target_bool = (target_batch[i] == j).flatten()
+                if np.alltrue(pred_bool == target_bool): # 规避dice()在输入全0时输出nan的问题
+                    dice_score.append(0.0)
+                else:
+                    dice_score.append(dice(pred_bool, target_bool))
                 # TODO: 计算AHD。scipy中的directed_hausdorff计算的是HD而不是AHD。相关资料参考（关键词：Hausdorff）https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/
             self.dice_scores.append(tuple(dice_score))
 
@@ -172,7 +177,7 @@ class Trainer:
             resume = False
             self.epoch_start = 0
         else: # 使用了resume参数
-            if args.resume == "": # 使用了resume参数，没有填写checkpoint路径
+            if args.resume is None: # 使用了resume参数，没有填写checkpoint路径
                 resume = True
                 ckpt_path = sorted(glob(os.path.join(args.exp_dir, CKPT_FILENAME_GLOB)))[-1]
             else: # 使用了resume参数，填写了checkpoint路径
@@ -184,18 +189,19 @@ class Trainer:
     def train(self, data_loader_train, data_loader_dev):
         for epoch_i in range(self.epoch_start + 1, self.num_epochs + 1):
             # train
-            logging.info("Epoch %d: Training"%epoch_i)
+            logging.info("Epoch %d/%d: Training" % (epoch_i, self.num_epochs))
             self.model.train()
             self.criterion.train()
             self.optimizer.zero_grad()
 
+            num_iters = len(data_loader_train)
             for iter_i, (data_batch, target_batch) in enumerate(data_loader_train):
                 data_batch, target_batch = data_batch.to(self.device), target_batch.to(self.device)
                 # forward
                 out = self.model(data_batch)
                 out_p = out.permute(0, 2, 3, 1) # 将channel维放在最后
                 loss = self.criterion(out_p.reshape(-1, out_p.shape[-1]), target_batch.flatten())
-                logging.info("    Iter %d: loss = %.3f" % (iter_i + 1, loss))
+                logging.info("    Iter %d/%d: loss = %.3f" % (iter_i + 1, num_iters, loss))
                 # backward
                 loss.backward()
                 # 梯度累加
@@ -206,7 +212,7 @@ class Trainer:
                     self.optimizer.zero_grad()
 
             # validation
-            logging.info("Epoch %d: Validation" % epoch_i)
+            logging.info("Epoch %d/%d: Validation" % (epoch_i, self.num_epochs))
             self.model.eval()
             self.criterion.eval()
             self.metric.reset()
@@ -218,7 +224,13 @@ class Trainer:
                     self.metric.update(out_p.cpu().detach().numpy().argmax(
                         axis=3), target_batch.cpu().detach().numpy())
             dice_mean, dice_var = self.metric.result()
-            logging.info("    Dice = (%.2f +- %.2f), AHD = (NULL)")
+            dice_stdvar = np.sqrt(dice_var)
+            logging.info("    Dice = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f), AHD = (NULL)" %
+                    (dice_mean[0], dice_stdvar[0],
+                     dice_mean[1], dice_stdvar[1],
+                     dice_mean[2], dice_stdvar[2],
+                     dice_mean[3], dice_stdvar[3],
+                     dice_mean[4], dice_stdvar[4],))
             # TODO: 是否加入scheduler?
 
             # 保存checkpoint
@@ -269,7 +281,7 @@ def main(cmd_args):
     dataset_train = SegDataSet(args, "train")
     dataset_dev= SegDataSet(args, "dev")
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True)
-    data_loader_dev = torch.utils.data.DataLoader(dataset_dev, batch_size=args.batch_size, shuffle=True)
+    data_loader_dev = torch.utils.data.DataLoader(dataset_dev, batch_size=args.batch_size, shuffle=False)
 
     model = SegModel(args).to(args.device)
 
