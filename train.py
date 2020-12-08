@@ -143,6 +143,11 @@ class FocalLoss(nn.Module):
         return loss
 
 
+def one_hot(x, num_classes):
+    result = torch.zeros(x.shape + (num_classes,)).to(x.device)
+    result.scatter_(len(x.shape), x.unsqueeze(len(x.shape)), torch.ones(x.shape + (1,), device=x.device))
+    return result
+
 def save_checkpoint(path: str, epoch_i: int, model: nn.Module, criterion: nn.Module, optimizer: nn.Module):
     torch.save((epoch_i, model.state_dict(), criterion.state_dict(), optimizer.state_dict()), path)
 
@@ -169,6 +174,7 @@ class Trainer:
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
+        self.num_classes = args.num_classes
         self.num_epochs = args.num_epochs
         self.accum_grad = args.accum_grad
         self.exp_dir = args.exp_dir
@@ -200,7 +206,10 @@ class Trainer:
                 # forward
                 out = self.model(data_batch)
                 out_p = out.permute(0, 2, 3, 1) # 将channel维放在最后
-                loss = self.criterion(out_p.reshape(-1, out_p.shape[-1]), target_batch.flatten())
+                if type(self.criterion) in [nn.MSELoss]:
+                    loss = self.criterion(out_p.reshape(-1, out_p.shape[-1]), one_hot(target_batch.flatten(), self.num_classes))
+                else:
+                    loss = self.criterion(out_p.reshape(-1, out_p.shape[-1]), target_batch.flatten())
                 logging.info("    Iter %d/%d: loss = %.3f" % (iter_i + 1, num_iters, loss))
                 # backward
                 loss.backward()
@@ -231,6 +240,7 @@ class Trainer:
                      dice_mean[2], dice_stdvar[2],
                      dice_mean[3], dice_stdvar[3],
                      dice_mean[4], dice_stdvar[4],))
+            logging.info("    AHD = (NULL)")
             # TODO: 是否加入scheduler?
 
             # 保存checkpoint

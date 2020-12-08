@@ -41,7 +41,7 @@ def add_context2(imgs: list, gts: list):
             img_list[2].unsqueeze(0),
             img_list[3].unsqueeze(0)
         )))
-        for i in range(1, len(img_list) - 1):
+        for i in range(2, len(img_list) - 2):
             img_list_new.append(torch.cat((
                 img_list[i - 2].unsqueeze(0),
                 img_list[i - 1].unsqueeze(0),
