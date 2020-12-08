@@ -30,14 +30,13 @@ def cutter(args, model: nn.Module, data_loader: DataLoader):
 
     i = 0
     with tqdm(desc="Segment") as pbar:
-        for iter_i, (data_batch, target_batch) in enumerate(data_loader):
+        for iter_i, (data_batch, target) in enumerate(data_loader):
             data_batch = data_batch.to(args.device)
             out = model(data_batch)         # shape: [B, C, H, W]
             out = out.permute(0, 2, 3, 1)   # shape: [B, H, W, C]
             out = out.max(dim=-1)[1].cpu()  # shape: [B, H, W]
 
-            target = target_batch.permute(0, 2, 1)     # shape: [B, H, W]
-
+            # target.shape: [B, H, W]
             if args.show == "stack":
                 results = out + target * 2
             else:   # == "cat"
