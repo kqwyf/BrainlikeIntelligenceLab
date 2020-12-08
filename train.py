@@ -194,8 +194,8 @@ class Trainer:
                 # forward
                 out = self.model(data_batch)
                 out_p = out.permute(0, 2, 3, 1) # 将channel维放在最后
-                loss = self.criterion(out_p.view(-1, out_p.shape[-1]), target_batch.flatten())
-                logging.info("    loss = %.3f" % (loss))
+                loss = self.criterion(out_p.reshape(-1, out_p.shape[-1]), target_batch.flatten())
+                logging.info("    Iter %d: loss = %.3f" % (iter_i + 1, loss))
                 # backward
                 loss.backward()
                 # 梯度累加
@@ -261,7 +261,8 @@ def main(cmd_args):
     os.makedirs(args.exp_dir, exist_ok=True)
 
     logging.basicConfig(filename=os.path.join(args.exp_dir, LOG_FILENAME),
-                        format="%(asctime)s - $(levelname)s - %(message)s",
+                        level="INFO",
+                        format="%(asctime)s - %(levelname)s - %(message)s",
                         datefmt="%y-%m-%d %H:%M:%S")
 
     # create objects needed by training

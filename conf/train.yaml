@@ -17,7 +17,7 @@ device: "cuda:0"
 optimizer: "adam"
 criterion: "ce"  # 可选：ce, mse, focal
 num-epochs: 20
-batch-size: 1
+batch-size: 4
 learning-rate: 1e-3
 accum-grad: 1 # 连续累加多少个batch的梯度再优化
 resume: "NONE" # "NONE"表示从头训练

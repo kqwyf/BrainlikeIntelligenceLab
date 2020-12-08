@@ -40,11 +40,13 @@ class UNet(nn.Module):
             self.downs.append(Down(current_num_channels, current_num_channels * 2))
             current_num_channels *= 2
         self.downs.append(Down(current_num_channels, current_num_channels * 2 // factor))
+        self.downs = nn.ModuleList(self.downs)
         current_num_channels *= 2
         for i in range(self.num_layers - 1):
             self.ups.append(Up(current_num_channels, current_num_channels // (2 * factor), self.bilinear))
             current_num_channels //= 2
         self.ups.append(Up(current_num_channels, current_num_channels // 2, self.bilinear))
+        self.ups = nn.ModuleList(self.ups)
         self.outc = OutConv(self.init_channels, num_classes)
 
     def forward(self, x):
