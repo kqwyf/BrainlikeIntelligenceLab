@@ -34,16 +34,16 @@ def cutter(args, model: nn.Module, data_loader: DataLoader):
             data_batch = data_batch.to(args.device)
             out = model(data_batch)         # shape: [B, C, H, W]
             out = out.permute(0, 2, 3, 1)   # shape: [B, H, W, C]
-            out = out.max(dim=-1)[1]        # shape: [B, H, W, 1]
+            out = out.max(dim=-1)[1].cpu()  # shape: [B, H, W]
 
-            target = target_batch.permute(0, 2, 3, 1)     # shape: [B, H, W, 1]
+            target = target_batch.permute(0, 2, 1)     # shape: [B, H, W]
 
             if args.show == "stack":
                 results = out + target * 2
             else:   # == "cat"
                 results = torch.cat([out, target], dim=2)   # cat on 'W'
 
-            results = results.cpu().numpy()
+            results = results.numpy()
 
             # 保存结果
             for img in results:
