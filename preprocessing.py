@@ -1,6 +1,13 @@
 import torch
 
 
+def add_channel_dim(imgs: list, gts: list):
+    for img_list in imgs:
+        for i in range(len(img_list)):
+            img_list[i] = img_list[i].unsqueeze(0)
+    return imgs, gts
+
+
 def add_context1(imgs: list, gts: list):
     imgs_new = []
     for img_list in imgs:
@@ -90,6 +97,7 @@ def normalize_group(imgs: list, gts: list):
 
 
 PREPROCESSING_FUNCS = {
+    "add_channel_dim": add_channel_dim,
     "add_context1": add_context1,
     "add_context2": add_context2,
     "expand": expand,
