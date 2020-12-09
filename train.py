@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from numpy.core.umath_tests import inner1d
 from scipy.spatial.distance import dice, directed_hausdorff
 
 from data import SegDataSet
@@ -43,10 +44,18 @@ class Metric:
         self.dice_scores = []
         self.ahd_scores = []
 
-    def update(self, pred_batch: torch.Tensor, target_batch: torch.Tensor):
+    def update(self, pred_batch: np.ndarray, target_batch: np.ndarray):
+        """
+        Input:
+          - pred_batch.shape:   [B, H, W]
+          - target_batch.shape: [B, H, W]
+        """
         assert len(pred_batch) == len(target_batch)
+
         for i in range(len(pred_batch)):
             dice_score = []
+            ahd_score = []
+
             for j in range(self.num_classes):
                 pred_bool = (pred_batch[i] == j).flatten()
                 target_bool = (target_batch[i] == j).flatten()
@@ -54,13 +63,29 @@ class Metric:
                     dice_score.append(0.0)
                 else:
                     dice_score.append(dice(pred_bool, target_bool))
-                # TODO: 计算AHD。scipy中的directed_hausdorff计算的是HD而不是AHD。相关资料参考（关键词：Hausdorff）https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/
+
+                # 计算AHD
+                pred_coord = np.array(np.where(pred_batch[i] == j)).T
+                target_coord = np.array(np.where(target_batch[i] == j)).T
+                D_mat = np.sqrt(inner1d(pred_coord, pred_coord)[np.newaxis].T
+                                + inner1d(target_coord, target_coord)
+                                - 2 * np.dot(pred_coord, target_coord.T))
+                dH = np.max(np.array([
+                        np.max(np.min(D_mat, axis=0)),
+                        np.max(np.min(D_mat, axis=1))
+                    ]))
+                ahd_score.append(dH)
+
             self.dice_scores.append(tuple(dice_score))
+            self.ahd_scores.append(tuple(ahd_score))
 
     def result(self):
         dice_mean = np.mean(np.array(self.dice_scores), axis=0)
         dice_var = np.var(np.array(self.dice_scores), axis=0)
-        return dice_mean, dice_var
+
+        ahd_mean = np.mean(np.array(self.ahd_scores), axis=0)
+        ahd_var = np.var(np.array(self.ahd_scores), axis=0)
+        return dice_mean, dice_var, ahd_mean, ahd_var
 
 
 class FocalLoss(nn.Module):
@@ -148,6 +173,7 @@ def one_hot(x, num_classes):
     result.scatter_(len(x.shape), x.unsqueeze(len(x.shape)), torch.ones(x.shape + (1,), device=x.device))
     return result
 
+
 def save_checkpoint(path: str, epoch_i: int, model: nn.Module, criterion: nn.Module, optimizer: nn.Module):
     torch.save((epoch_i, model.state_dict(), criterion.state_dict(), optimizer.state_dict()), path)
 
@@ -228,11 +254,11 @@ class Trainer:
             with torch.no_grad():
                 for iter_i, (data_batch, target_batch) in enumerate(data_loader_dev):
                     data_batch, target_batch = data_batch.to(self.device), target_batch.to(self.device)
-                    out = self.model(data_batch)
-                    out_p = out.permute(0, 2, 3, 1) # 将channel维放在最后
-                    self.metric.update(out_p.cpu().detach().numpy().argmax(
-                        axis=3), target_batch.cpu().detach().numpy())
-            dice_mean, dice_var = self.metric.result()
+                    out = self.model(data_batch)        # shape: [B, C, H, W]
+                    out_p = out.permute(0, 2, 3, 1)     # shape: [B, H, W, C]
+                    self.metric.update(out_p.cpu().detach().numpy().argmax(axis=3),  # shape: [B, H, W]
+                                       target_batch.cpu().detach().numpy())
+            dice_mean, dice_var, ahd_mean, ahd_var = self.metric.result()
             dice_stdvar = np.sqrt(dice_var)
             logging.info("    Dice = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f), AHD = (NULL)" %
                     (dice_mean[0], dice_stdvar[0],
