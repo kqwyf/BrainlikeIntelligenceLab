@@ -31,3 +31,7 @@ unet-init-channels: 64 # 数据正式进入U形网络前应处理至的通道数
 unet-num-layers: 4 # UNet的单边网络层数
 unet-bilinear: True # UNet中是否使用双线性插值完成上采样
 
+# Focal Loss
+focal-alpha: [1.0, 1.0, 1.0, 1.0, 1.0] # 各类权重，默认全1
+focal-gamma: 0.0
+

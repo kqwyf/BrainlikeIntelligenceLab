@@ -43,7 +43,7 @@ class Metric:
         self.dice_scores = []
         self.ahd_scores = []
 
-    def update(self, pred_batch: torch.Tensor, target_batch: torch.Tensor):
+    def update(self, pred_batch: np.ndarray, target_batch: np.ndarray):
         assert len(pred_batch) == len(target_batch)
         for i in range(len(pred_batch)):
             dice_score = []
@@ -51,9 +51,9 @@ class Metric:
                 pred_bool = (pred_batch[i] == j).flatten()
                 target_bool = (target_batch[i] == j).flatten()
                 if np.alltrue(pred_bool == target_bool): # 规避dice()在输入全0时输出nan的问题
-                    dice_score.append(0.0)
+                    dice_score.append(1.0)
                 else:
-                    dice_score.append(dice(pred_bool, target_bool))
+                    dice_score.append(1 - dice(pred_bool, target_bool)) # Dice score = 1 - Dice distance
                 # TODO: 计算AHD。scipy中的directed_hausdorff计算的是HD而不是AHD。相关资料参考（关键词：Hausdorff）https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4533825/
             self.dice_scores.append(tuple(dice_score))
 
@@ -74,13 +74,16 @@ class FocalLoss(nn.Module):
         - y: (batch_size,) or (batch_size, d1, d2, ..., dK), K > 0.
     """
 
-    def __init__(self, alpha: Optional[torch.Tensor] = None, gamma: float = 0.,
-                 reduction: str = 'mean', ignore_index: int = -100):
+    @staticmethod
+    def add_arguments(parser):
+        parser.add_argument("--focal-alpha", default=None, action="append", type=float,
+                help="Focal Loss的alpha参数，控制各类权重。")
+        parser.add_argument("--focal-gamma", default=0.0, type=float,
+                help="Focal Loss的gamma参数。")
+
+    def __init__(self, args, reduction: str = 'mean', ignore_index: int = -100):
         """
         Args:
-            alpha (Tensor, optional): Weights for each class. Defaults to None.
-            gamma (float, optional): A constant, as described in the paper.
-                Defaults to 0.
             reduction (str, optional): 'mean', 'sum' or 'none'.
                 Defaults to 'mean'.
             ignore_index (int, optional): class label to ignore.
@@ -90,13 +93,13 @@ class FocalLoss(nn.Module):
             raise ValueError('Reduction must be one of: "mean", "sum", "none".')
 
         super().__init__()
-        self.alpha = alpha
-        self.gamma = gamma
+        self.alpha = torch.tensor(args.focal_alpha)
+        self.gamma = args.focal_gamma
         self.ignore_index = ignore_index
         self.reduction = reduction
 
         self.nll_loss = nn.NLLLoss(
-            weight=alpha, reduction='none', ignore_index=ignore_index)
+            weight=self.alpha, reduction='none', ignore_index=ignore_index)
 
     def __repr__(self):
         arg_keys = ['alpha', 'gamma', 'ignore_index', 'reduction']
@@ -234,7 +237,7 @@ class Trainer:
                         axis=3), target_batch.cpu().detach().numpy())
             dice_mean, dice_var = self.metric.result()
             dice_stdvar = np.sqrt(dice_var)
-            logging.info("    Dice = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f), AHD = (NULL)" %
+            logging.info("    Dice = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f)" %
                     (dice_mean[0], dice_stdvar[0],
                      dice_mean[1], dice_stdvar[1],
                      dice_mean[2], dice_stdvar[2],
@@ -272,6 +275,7 @@ def main(cmd_args):
     parser.add_argument("--criterion", choices=["ce", "mse", "focal"], default="focal",
             help="Loss函数，可选项包括：ce（交叉熵），mse（最小均方误差）。")
 
+    FocalLoss.add_arguments(parser)
     Trainer.add_arguments(parser)
     SegModel.add_arguments(parser)
     SegDataSet.add_arguments(parser)
@@ -305,7 +309,7 @@ def main(cmd_args):
     elif args.criterion == "mse":
         criterion = nn.MSELoss()
     elif args.criterion == "focal":
-        criterion = FocalLoss()
+        criterion = FocalLoss(args)
     else:
         raise NotImplementedError("Criterion %s not implemented" % args.criterion)
     criterion.to(args.device)
