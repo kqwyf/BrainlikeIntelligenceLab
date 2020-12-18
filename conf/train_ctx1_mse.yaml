@@ -16,7 +16,7 @@ dataset-preprocessing: ["normalize_group", "add_context1", "expand"] # 以逗号
 #exp-dir: "exp/train" # 实验目录，通常无需设置该参数，会根据配置文件名生成
 device: "cuda:0"
 optimizer: "adam"
-criterion: "ce"  # 可选：ce, mse, focal
+criterion: "mse"  # 可选：ce, mse, focal
 num-epochs: 10
 batch-size: 4
 learning-rate: 1e-3

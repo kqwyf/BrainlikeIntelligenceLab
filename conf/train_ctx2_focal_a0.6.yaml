@@ -10,13 +10,13 @@ dataset-num-dev-samples: 5 # 将训练集中的多少病人用作开发集
 # expand：将成组数据展开为独立的图片。由于输出图片不再成组，应放在所有预处理步骤的最后使用。
 # normalize：对每张图片进行正态归一化。
 # normalize_group：对每组图片进行正态归一化。
-dataset-preprocessing: ["normalize_group", "add_context1", "expand"] # 以逗号隔开多个步骤会让它们按顺序执行
+dataset-preprocessing: ["normalize_group", "add_context2", "expand"] # 以逗号隔开多个步骤会让它们按顺序执行
 
 # 训练
 #exp-dir: "exp/train" # 实验目录，通常无需设置该参数，会根据配置文件名生成
 device: "cuda:0"
 optimizer: "adam"
-criterion: "ce"  # 可选：ce, mse, focal
+criterion: "focal"  # 可选：ce, mse, focal
 num-epochs: 10
 batch-size: 4
 learning-rate: 1e-3
@@ -27,12 +27,12 @@ resume: "NONE" # "NONE"表示从头训练
 num-classes: 5 # 最终分类数
 unet-input-height: 512 # UNet的输入尺寸（高度）
 unet-input-width: 512 # UNet的输入尺寸（宽度）
-unet-input-channels: 3 # UNet的输入尺寸（通道数）
+unet-input-channels: 5 # UNet的输入尺寸（通道数）
 unet-init-channels: 64 # 数据正式进入U形网络前应处理至的通道数
 unet-num-layers: 4 # UNet的单边网络层数
 unet-bilinear: True # UNet中是否使用双线性插值完成上采样
 
 # Focal Loss
-focal-alpha: [1.0, 1.0, 1.0, 1.0, 1.0] # 各类权重，默认全1
-focal-gamma: 0.0
+focal-alpha: [0.6, 1.0, 1.0, 1.0, 1.0] # 各类权重，默认全1
+focal-gamma: 2
 
