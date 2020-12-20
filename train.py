@@ -64,16 +64,24 @@ class Metric:
                 else:
                     dice_score.append(1 - dice(pred_bool, target_bool)) # Dice score = 1 - Dice distance
                 # 计算AHD
-                pred_coord = np.array(np.where(pred_batch[i] == j)).T
-                target_coord = np.array(np.where(target_batch[i] == j)).T
-                D_mat = np.sqrt(inner1d(pred_coord, pred_coord)[np.newaxis].T
-                                + inner1d(target_coord, target_coord)
-                                - 2 * np.dot(pred_coord, target_coord.T))
-                dH = np.max(np.array([
-                        np.max(np.min(D_mat, axis=0)),
-                        np.max(np.min(D_mat, axis=1))
-                    ]))
-                ahd_score.append(dH)
+                if j == 0:
+                    ahd_score.append(-1.0) # 不计算背景像素的分数，因为会占很大内存，而且没有用处
+                else:
+                    pred_coord = np.array(np.where(pred_batch[i] == j)).T
+                    target_coord = np.array(np.where(target_batch[i] == j)).T
+                    if len(target_coord) == 0 and len(pred_coord) == 0: # 规避0长度数组
+                        ahd_score.append(1.0)
+                    elif len(target_coord) == 0 or len(pred_coord) == 0:
+                        ahd_score.append(0.0)
+                    else:
+                        D_mat = np.sqrt(inner1d(pred_coord, pred_coord)[np.newaxis].T
+                                        + inner1d(target_coord, target_coord)
+                                        - 2 * np.dot(pred_coord, target_coord.T))
+                        dH = np.max(np.array([
+                                np.max(np.min(D_mat, axis=0)),
+                                np.max(np.min(D_mat, axis=1))
+                            ]))
+                        ahd_score.append(dH)
 
             self.dice_scores.append(tuple(dice_score))
             self.ahd_scores.append(tuple(ahd_score))
@@ -207,6 +215,10 @@ class Trainer:
         self.accum_grad = args.accum_grad
         self.exp_dir = args.exp_dir
         self.device = args.device
+        if args.dataset_num_dev_samples == 0:
+            self.do_validation = False
+        else:
+            self.do_validation = True
         if args.resume == "NONE": # 没有使用resume参数
             resume = False
             self.epoch_start = 0
@@ -249,32 +261,33 @@ class Trainer:
                     self.optimizer.zero_grad()
 
             # validation
-            logging.info("Epoch %d/%d: Validation" % (epoch_i, self.num_epochs))
-            self.model.eval()
-            self.criterion.eval()
-            self.metric.reset()
-            with torch.no_grad():
-                for iter_i, (data_batch, target_batch) in enumerate(data_loader_dev):
-                    data_batch, target_batch = data_batch.to(self.device), target_batch.to(self.device)
-                    out = self.model(data_batch)        # shape: [B, C, H, W]
-                    out_p = out.permute(0, 2, 3, 1)     # shape: [B, H, W, C]
-                    self.metric.update(out_p.cpu().detach().numpy().argmax(axis=3),  # shape: [B, H, W]
-                                       target_batch.cpu().detach().numpy())
-            dice_mean, dice_var, ahd_mean, ahd_var = self.metric.result()
-            dice_stdvar, ahd_stdvar = np.sqrt(dice_var), np.sqrt(ahd_var)
-            logging.info("    Dice = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f)" %
-                    (dice_mean[0], dice_stdvar[0],
-                     dice_mean[1], dice_stdvar[1],
-                     dice_mean[2], dice_stdvar[2],
-                     dice_mean[3], dice_stdvar[3],
-                     dice_mean[4], dice_stdvar[4],))
-            logging.info("    AHD = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f)" %
-                    (ahd_mean[0], ahd_stdvar[0],
-                     ahd_mean[1], ahd_stdvar[1],
-                     ahd_mean[2], ahd_stdvar[2],
-                     ahd_mean[3], ahd_stdvar[3],
-                     ahd_mean[4], ahd_stdvar[4],))
-            # TODO: 是否加入scheduler?
+            if self.do_validation:
+                logging.info("Epoch %d/%d: Validation" % (epoch_i, self.num_epochs))
+                self.model.eval()
+                self.criterion.eval()
+                self.metric.reset()
+                with torch.no_grad():
+                    for iter_i, (data_batch, target_batch) in enumerate(data_loader_dev):
+                        data_batch, target_batch = data_batch.to(self.device), target_batch.to(self.device)
+                        out = self.model(data_batch)        # shape: [B, C, H, W]
+                        out_p = out.permute(0, 2, 3, 1)     # shape: [B, H, W, C]
+                        self.metric.update(out_p.cpu().detach().numpy().argmax(axis=3),  # shape: [B, H, W]
+                                           target_batch.cpu().detach().numpy())
+                dice_mean, dice_var, ahd_mean, ahd_var = self.metric.result()
+                dice_stdvar, ahd_stdvar = np.sqrt(dice_var), np.sqrt(ahd_var)
+                logging.info("    Dice = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f)" %
+                        (dice_mean[0], dice_stdvar[0],
+                         dice_mean[1], dice_stdvar[1],
+                         dice_mean[2], dice_stdvar[2],
+                         dice_mean[3], dice_stdvar[3],
+                         dice_mean[4], dice_stdvar[4],))
+                logging.info("    AHD = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f)" %
+                        (ahd_mean[0], ahd_stdvar[0],
+                         ahd_mean[1], ahd_stdvar[1],
+                         ahd_mean[2], ahd_stdvar[2],
+                         ahd_mean[3], ahd_stdvar[3],
+                         ahd_mean[4], ahd_stdvar[4],))
+                # TODO: 是否加入scheduler?
 
             # 保存checkpoint
             ckpt_path = os.path.join(self.exp_dir, CKPT_FILENAME % epoch_i)

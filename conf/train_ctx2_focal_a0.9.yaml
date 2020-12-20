@@ -1,7 +1,7 @@
 # 数据集
 dataset-path-train: "/mnt/lustre/sjtu/home/yfw51/Datasets/SegTHOR2019/train"
 dataset-path-test: "/mnt/lustre/sjtu/home/yfw51/Datasets/SegTHOR2019/test"
-dataset-num-dev-samples: 5 # 将训练集中的多少病人用作开发集
+dataset-num-dev-samples: 0 # 将训练集中的多少病人用作开发集
 
 # 数据预处理
 # add_channel_dim：为每张图片加入channel维。
