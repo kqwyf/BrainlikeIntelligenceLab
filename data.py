@@ -64,7 +64,7 @@ class SegDataSet(Dataset):
         gt_files = sorted(glob(os.path.join(path, "*/GT.nii")))
 
         if mode == "train":
-            img_files, gt_files = img_files[:-self.num_dev_samples], gt_files[:-self.num_dev_samples]
+            img_files, gt_files = img_files[:len(img_files) - self.num_dev_samples], gt_files[:len(img_files) - self.num_dev_samples]
         elif mode == "dev":
             img_files, gt_files = img_files[-self.num_dev_samples:], gt_files[-self.num_dev_samples:]
 
