@@ -83,8 +83,8 @@ class SegDataSet(Dataset):
             buff_img, buff_gt = [], []
 
             for i in range(img_data.shape[2]):
-                buff_img.append(torch.Tensor(img_data[:, :, i], dtype=torch.float32))
-                buff_gt.append(torch.Tensor(gt_data[:, :, i], dtype=torch.long))
+                buff_img.append(torch.FloatTensor(img_data[:, :, i]))
+                buff_gt.append(torch.LongTensor(gt_data[:, :, i]))
 
             self.imgs.append(buff_img)
             self.gts.append(buff_gt)
