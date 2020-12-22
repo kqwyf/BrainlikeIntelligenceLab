@@ -5,6 +5,7 @@ from glob import glob
 
 import configargparse
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -12,6 +13,7 @@ from torch.utils.data import DataLoader
 
 from data import SegDataSet
 from model import SegModel
+from train import Metric
 
 CONFIG_FILE = "conf/train.yaml"  # 默认配置文件路径
 LOG_FILENAME = "cut.log"
@@ -27,6 +29,8 @@ def load_checkpoint(path: str, model: nn.Module):
 @torch.no_grad()
 def cutter(args, model: nn.Module, data_loader: DataLoader):
     model.eval()
+    metric = Metric(args)
+    metric.reset()
 
     i = 0
     with tqdm(desc="Segment") as pbar:
@@ -35,6 +39,7 @@ def cutter(args, model: nn.Module, data_loader: DataLoader):
             out = model(data_batch)         # shape: [B, C, H, W]
             out = out.permute(0, 2, 3, 1)   # shape: [B, H, W, C]
             out = out.max(dim=-1)[1].cpu()  # shape: [B, H, W]
+            metric.update(out.detach().numpy(), target.numpy())
 
             # target.shape: [B, H, W]
             if args.show == "stack":
@@ -50,6 +55,21 @@ def cutter(args, model: nn.Module, data_loader: DataLoader):
                 plt.imsave(im_path, img)
                 i += 1
                 pbar.update()
+
+    dice_mean, dice_var, ahd_mean, ahd_var = metric.result()
+    dice_stdvar, ahd_stdvar = np.sqrt(dice_var), np.sqrt(ahd_var)
+    logging.info("Dice = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f)" %
+            (dice_mean[0], dice_stdvar[0],
+             dice_mean[1], dice_stdvar[1],
+             dice_mean[2], dice_stdvar[2],
+             dice_mean[3], dice_stdvar[3],
+             dice_mean[4], dice_stdvar[4],))
+    logging.info("AHD = (%.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f, %.2f +- %.2f)" %
+            (ahd_mean[0], ahd_stdvar[0],
+             ahd_mean[1], ahd_stdvar[1],
+             ahd_mean[2], ahd_stdvar[2],
+             ahd_mean[3], ahd_stdvar[3],
+             ahd_mean[4], ahd_stdvar[4],))
 
     logging.info("Segmentation completed.")
 
