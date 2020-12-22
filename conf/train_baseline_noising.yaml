@@ -11,7 +11,7 @@ dataset-num-dev-samples: 0 # 将训练集中的多少病人用作开发集
 # normalize：对每张图片进行正态归一化。
 # normalize_group：对每组图片进行正态归一化。
 dataset-preprocessing: ["normalize_group", "add_channel_dim", "expand"] # 以逗号隔开多个步骤会让它们按顺序执行
-noising: False  # 是否在训练是加入噪音
+noising: True  # 是否在训练是加入噪音
 
 # 训练
 #exp-dir: "exp/train" # 实验目录，通常无需设置该参数，会根据配置文件名生成

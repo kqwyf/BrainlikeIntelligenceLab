@@ -49,10 +49,12 @@ class SegDataSet(Dataset):
                         expand：将成组数据展开为独立的图片。由于输出图片不再成组，应放在所有预处理步骤的最后使用。
                         normalize：对每张图片进行正态归一化。
                         normalize_group：对每组图片进行正态归一化。""")
+        parser.add_argument("--noising", type=bool, default=False, help="是否在训练集中加入噪音。")
 
-    def __init__(self, args, mode):
+    def __init__(self, args, mode: str):
         """
-        :param mode: 可选项：train, dev, test
+        :param mode (str):      train, dev, test
+        :param noise (bool):    是否在训练数据中加入噪声
         """
         self.num_dev_samples = args.dataset_num_dev_samples
 
@@ -62,6 +64,9 @@ class SegDataSet(Dataset):
             path = args.dataset_path_test
         img_files = sorted(glob(os.path.join(path, "*/Patient_*.nii")))
         gt_files = sorted(glob(os.path.join(path, "*/GT.nii")))
+
+        self.mode = mode
+        self.noise = args.noising and (mode == "train")
 
         if mode == "train":
             img_files, gt_files = img_files[:len(img_files) - self.num_dev_samples], gt_files[:len(img_files) - self.num_dev_samples]
@@ -78,8 +83,8 @@ class SegDataSet(Dataset):
             buff_img, buff_gt = [], []
 
             for i in range(img_data.shape[2]):
-                buff_img.append(torch.tensor(img_data[:, :, i], dtype=torch.float32))
-                buff_gt.append(torch.tensor(gt_data[:, :, i], dtype=torch.long))
+                buff_img.append(torch.Tensor(img_data[:, :, i], dtype=torch.float32))
+                buff_gt.append(torch.Tensor(gt_data[:, :, i], dtype=torch.long))
 
             self.imgs.append(buff_img)
             self.gts.append(buff_gt)
@@ -97,4 +102,10 @@ class SegDataSet(Dataset):
         else:
             img = self.imgs[index]
             gt = self.gts[index]
+
+        # de-nosing training
+        if self.noise:
+            noise = torch.randn_like(img) * 1e-4
+            img += noise
+
         return img, gt
