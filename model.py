@@ -72,6 +72,10 @@ class LMSER(nn.Module):
 
 
 class SegModel(nn.Module):
+    """
+    实际使用的分割模型。
+    """
+
     @staticmethod
     def add_arguments(parser):
         parser.add_argument("--num-classes", default=5, type=int,

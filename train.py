@@ -96,11 +96,10 @@ class Metric:
 
 
 class FocalLoss(nn.Module):
-    """ Focal Loss, as described in https://arxiv.org/abs/1708.02002.
-    It is essentially an enhancement to cross entropy loss and is
-    useful for classification tasks when there is a large class imbalance.
-    x is expected to contain raw, unnormalized scores for each class.
-    y is expected to contain class labels.
+    """
+    Focal Loss实现，参考https://arxiv.org/abs/1708.02002
+    是CE的一种改进，能够有效解决类别不均衡问题。
+
     Shape:
         - x: (batch_size, C) or (batch_size, C, d1, d2, ..., dK), K > 0.
         - y: (batch_size,) or (batch_size, d1, d2, ..., dK), K > 0.
@@ -116,10 +115,10 @@ class FocalLoss(nn.Module):
     def __init__(self, args, reduction: str = 'mean', ignore_index: int = -100):
         """
         Args:
-            reduction (str, optional): 'mean', 'sum' or 'none'.
-                Defaults to 'mean'.
-            ignore_index (int, optional): class label to ignore.
-                Defaults to -100.
+            reduction (str, optional): 'mean', 'sum'或者'none'。
+                默认为'mean'。
+            ignore_index (int, optional): 忽略某个类别编号。
+                默认为-100。
         """
         if reduction not in ('mean', 'sum', 'none'):
             raise ValueError('Reduction must be one of: "mean", "sum", "none".')
@@ -154,20 +153,20 @@ class FocalLoss(nn.Module):
             return 0.
         x = x[unignored_mask]
 
-        # compute weighted cross entropy term: -alpha * log(pt)
-        # (alpha is already part of self.nll_loss)
+        # 计算带权的交叉熵项：-alpha * log(p_t)
+        # alpha已经在self.nll_loss中算上了
         log_p = F.log_softmax(x, dim=-1)
         ce = self.nll_loss(log_p, y)
 
-        # get true class column from each row
+        # 提取每行中的真实类别
         all_rows = torch.arange(len(x))
         log_pt = log_p[all_rows, y]
 
-        # compute focal term: (1 - pt)^gamma
+        # 计算(1 - p_t)^gamma
         pt = log_pt.exp()
         focal_term = (1 - pt)**self.gamma
 
-        # The full loss: -alpha * ((1 - pt)^gamma) * log(pt)
+        # 整个loss
         loss = focal_term * ce
 
         if self.reduction == 'mean':
@@ -234,7 +233,7 @@ class Trainer:
 
     def train(self, data_loader_train, data_loader_dev):
         for epoch_i in range(self.epoch_start + 1, self.num_epochs + 1):
-            # train
+            # 训练阶段
             logging.info("Epoch %d/%d: Training" % (epoch_i, self.num_epochs))
             self.model.train()
             self.criterion.train()
@@ -260,7 +259,7 @@ class Trainer:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
 
-            # validation
+            # 验证阶段
             if self.do_validation:
                 logging.info("Epoch %d/%d: Validation" % (epoch_i, self.num_epochs))
                 self.model.eval()
@@ -287,7 +286,6 @@ class Trainer:
                          ahd_mean[2], ahd_stdvar[2],
                          ahd_mean[3], ahd_stdvar[3],
                          ahd_mean[4], ahd_stdvar[4],))
-                # TODO: 是否加入scheduler?
 
             # 保存checkpoint
             ckpt_path = os.path.join(self.exp_dir, CKPT_FILENAME % epoch_i)

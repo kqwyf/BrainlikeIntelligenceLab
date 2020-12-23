@@ -1,3 +1,7 @@
+"""
+一些用于预处理数据的函数，详见data.py。
+"""
+
 import torch
 
 
@@ -117,7 +121,6 @@ PREPROCESSING_FUNCS = {
 
 
 def preprocess(imgs, gts, tasks):
-    # TODO: 考虑更好的归一化方式？
     for task in tasks:
         imgs, gts = PREPROCESSING_FUNCS[task](imgs, gts)
     return imgs, gts

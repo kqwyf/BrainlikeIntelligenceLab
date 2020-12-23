@@ -115,15 +115,15 @@ def main(cmd_args):
                         format="%(asctime)s - %(levelname)s - %(message)s",
                         datefmt="%y-%m-%d %H:%M:%S")
 
-    # Create testset
+    # 测试集
     dataset = SegDataSet(args, "test")
     data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
-    # Create model
+    # 模型
     CT = SegModel(args).to(args.device)
     load_checkpoint(args.checkpoint, CT)
 
-    # Segment the region
+    # 进行分割
     cutter(args, CT, data_loader)
 
 
