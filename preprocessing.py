@@ -95,6 +95,13 @@ def normalize_group(imgs: list, gts: list):
         imgs[i] = [im for im in img_tensor]
     return imgs, gts
 
+def normalize_01(imgs: list, gts: list):
+    for i in range(len(imgs)):
+        img_tensor = torch.stack(imgs[i])
+        img_tensor = (img_tensor + 1000) / 32768
+        imgs[i] = [im for im in img_tensor]
+    return imgs, gts
+
 
 PREPROCESSING_FUNCS = {
     "add_channel_dim": add_channel_dim,
@@ -103,6 +110,7 @@ PREPROCESSING_FUNCS = {
     "expand": expand,
     "normalize": normalize,
     "normalize_group": normalize_group,
+    "normalize_01": normalize_01,
 }
 
 # 在DataLoader的collate_fn中调用以下函数以进行自定义预处理操作

@@ -22,6 +22,8 @@ class DoubleConv(nn.Module):
             nn.Dropout(0.2, inplace=True),
             nn.ReLU(inplace=True)
         )
+        nn.init.kaiming_normal_(self.double_conv[0].weight)
+        nn.init.kaiming_normal_(self.double_conv[4].weight)
 
     def forward(self, x):
         return self.double_conv(x)

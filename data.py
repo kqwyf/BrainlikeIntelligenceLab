@@ -41,14 +41,15 @@ class SegDataSet(Dataset):
                 help="测试集路径。")
         parser.add_argument("--dataset-num-dev-samples", type=int, required=True,
                 help="将训练集中的多少（病人）样本作为验证集。")
-        parser.add_argument("--dataset-preprocessing", action="append", choices=["add_channel_dim", "add_context1", "add_context2", "expand", "normalize", "normalize_group"],
+        parser.add_argument("--dataset-preprocessing", action="append", choices=["add_channel_dim", "add_context1", "add_context2", "expand", "normalize", "normalize_group", "normalize_01"],
                 help="""数据集需进行的预处理步骤，可用逗号隔开以连续使用多个步骤。
                         add_channel_dim：为每张图片加入channel维。
                         add_context1：为每张图片加入channel维，并对每组数据将前后1帧数据与当前帧在channel维上concat。
                         add_context2：为每张图片加入channel维，并对每组数据将前后2帧数据与当前帧在channel维上concat。
                         expand：将成组数据展开为独立的图片。由于输出图片不再成组，应放在所有预处理步骤的最后使用。
                         normalize：对每张图片进行正态归一化。
-                        normalize_group：对每组图片进行正态归一化。""")
+                        normalize_group：对每组图片进行正态归一化。
+                        normalize_01：对每组图片归一化至[0, 1]。""")
 
     def __init__(self, args, mode):
         """
